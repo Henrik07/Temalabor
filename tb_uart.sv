@@ -80,15 +80,19 @@ module tb_uart ();
     end
 
     logic [7:0] Din_1 = 8'h55;
-    assign tx_byte_1 = Din_1;
-
     logic [7:0] Din_2 = 8'h55;
-    assign tx_byte_2 = Din_2;
 
-    logic [7:0] Dout_1 = 8'h00;
-    always @(posedge clk_1) Dout_1 <= rx_byte_1;
+    logic [7:0] Dout_1;
+    logic [7:0] Dout_2;
 
-    logic [7:0] Dout_2 = 8'h00;
-    always @(posedge clk_2) Dout_2 <= rx_byte_2;
+    always @(posedge clk_1) begin
+        Dout_1 <= rx_byte_1;
+        tx_byte_1 <= Din_1;
+    end
+
+    always @(posedge clk_2) begin
+        Dout_2 <= rx_byte_2;
+        tx_byte_2 <= Din_2;
+    end
 
 endmodule
