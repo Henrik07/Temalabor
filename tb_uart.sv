@@ -31,6 +31,10 @@ module tb_uart ();
     logic [7:0] dout_1;
     logic [7:0] dout_2;
 
+    logic [7:0] rnd_value;
+
+    realtime t0,t1,t2;
+
     uart #(.CLOCK_DIVIDE( 2604 )) uart_1(
         .clk(clk_1),
         .rst(rst_n_1),
@@ -61,63 +65,114 @@ module tb_uart ();
 
     assign rx_1 = tx_2;
     assign rx_2 = tx_1;
-    assign tx_1 = rx_1;
-    assign tx_2 = rx_2;
 
     always #5ns clk_1 = ~clk_1;
     always #4.99ns clk_2 = ~clk_2;
 
-    initial begin
-        clk_1 = 1;
-        clk_2 = 1;
-        rst_n_1 = 0;
-        rst_n_2 = 0;
-        transmit_1 = 0;
-        transmit_2 = 0;
+    task uart_setup (input [7:0] a, b, output [7:0] c, d); 
+        begin
+        clk_1 = 1'b1;
+        clk_2 = 1'b1;
+        rst_n_1 = 1'b0;
+        rst_n_2 = 1'b0;
+        transmit_1 = 1'b0;
+        transmit_2 = 1'b0;
+        c  = a;
+        d  = b;
         #100ns;
-        rst_n_1 = 1;
-        rst_n_2 = 1;
-    end
+        rst_n_1 = 1'b1;
+        rst_n_2 = 1'b1;
+        #100ns;
+        end
+    endtask
 
-    always @(negedge clk_1) begin
-        if (!rst_n_1)begin
-            din_1 <= 8'h55;
+    task new_value (output rnd, tx_byte);
+        begin
+            rnd = $urandom_range(255,0);
+            tx_byte = rnd;
         end
-        else if (din_1 > 8'h00 && transmit_1)begin
-            din_1 <= din_1 - 8'h01;
-        end
-        else begin
-            din_1 <= din_1;
-        end
-    end
+    endtask
 
-    always @(posedge clk_1) begin
-        if (transmit_1) begin
-            dout_1 <= rx_byte_1;
-            tx_byte_1 <= din_1;
-            rx_byte_2 <= tx_byte_1;
-            #1ns
-            transmit_1 <= 0;
+    task get_time (output realtime a, b);
+        begin
+            a = $realtime;
+ 
+            @(posedge received_1, posedge received_2);
+            b = $realtime;
         end
-        else if (!transmit_1) begin
-            #1ns
-            transmit_1 <= 1;
-        end
-    end
+    endtask
 
-    always @(posedge clk_2) begin
-        if (transmit_2) begin
-            dout_2 <= rx_byte_2;
-            din_2 <= dout_2;
-            tx_byte_2 <= din_2;
-            rx_byte_1 <= tx_byte_2;
-            #1ns
-            transmit_2 <= 0;
+    task value_test (input [7:0] a, b);
+        begin
+            if (a == b) begin
+                $display("test pass - value ok");
+            end
+            else begin
+                $display("test failed - value error");
+            end
         end
-        else if (!transmit_2) begin
-            #1ns
-            transmit_2 <= 1;
+    endtask
+
+    task bit_time_test (input realtime a, b);
+        begin
+            if ( (103us*10) < (b-a) < (105us*10)) begin  //1 bitidő ~ 104us  //8n1 -> start+adat+stop = 10 bit
+                $display("test pass - bit time ok");
+            end
+            else begin
+                $display("test failed - bit time failed");
+            end
         end
+    endtask
+
+    initial begin
+        uart_setup (8'hFA, 8'b1111_1010, tx_byte_1, tx_byte_2);
+
+        repeat (3) begin
+
+            @(posedge clk_1);
+            #100ps;
+            transmit_1 = 1'b1;
+            
+            new_value(rnd_value, tx_byte_1);
+            
+            @(posedge clk_1);
+            #100ps;
+            transmit_1 = 1'b0;
+
+            get_time (t0, t1);
+
+            value_test (rnd_value, rx_byte_2);
+
+            bit_time_test (t0, t1);
+            
+            #500us;
+
+        end
+
+        #1ms;
+
+        repeat (3) begin
+
+            @(posedge clk_2);
+            #100ps;
+            transmit_2 = 1'b1;
+            
+            new_value(rnd_value, tx_byte_2);
+            
+            @(posedge clk_2);
+            #100ps;
+            transmit_2 = 1'b0;
+            
+            get_time (t0, t1);
+
+            value_test (rnd_value, rx_byte_1);
+
+            bit_time_test (t0, t1);
+            
+            #500us;
+
+        end
+
     end
 
 endmodule
