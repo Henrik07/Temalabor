@@ -69,7 +69,7 @@ module tb_uart ();
     always #5ns clk_1 = ~clk_1;
     always #4.99ns clk_2 = ~clk_2;
 
-    task uart_setup (input [7:0] a, b, output [7:0] c, d); 
+    task automatic uart_setup (input [7:0] a, b, ref [7:0] c, d); 
         begin
         clk_1 = 1'b1;
         clk_2 = 1'b1;
@@ -86,14 +86,22 @@ module tb_uart ();
         end
     endtask
 
-    task new_value (output rnd, tx_byte);
+    task automatic new_value (ref clk, transmit, ref [7:0] rnd, tx_byte);
         begin
+            @(posedge clk);
+            #100ps;
+            transmit = 1'b1;
+
             rnd = $urandom_range(255,0);
             tx_byte = rnd;
+            
+            @(posedge clk);
+            #100ps;
+            transmit = 1'b0;
         end
     endtask
 
-    task get_time (output realtime a, b);
+    task automatic get_time (ref realtime a, b);
         begin
             a = $realtime;
  
@@ -102,7 +110,7 @@ module tb_uart ();
         end
     endtask
 
-    task value_test (input [7:0] a, b);
+    task automatic value_test (input [7:0] a, b);
         begin
             if (a == b) begin
                 $display("test pass - value ok");
@@ -113,7 +121,7 @@ module tb_uart ();
         end
     endtask
 
-    task bit_time_test (input realtime a, b);
+    task automatic bit_time_test (input realtime a, b);
         begin
             if ( (103us*10) < (b-a) < (105us*10)) begin  //1 bitidő ~ 104us  //8n1 -> start+adat+stop = 10 bit
                 $display("test pass - bit time ok");
@@ -129,15 +137,7 @@ module tb_uart ();
 
         repeat (3) begin
 
-            @(posedge clk_1);
-            #100ps;
-            transmit_1 = 1'b1;
-            
-            new_value(rnd_value, tx_byte_1);
-            
-            @(posedge clk_1);
-            #100ps;
-            transmit_1 = 1'b0;
+            new_value(clk_1, transmit_1, rnd_value, tx_byte_1);
 
             get_time (t0, t1);
 
@@ -153,15 +153,7 @@ module tb_uart ();
 
         repeat (3) begin
 
-            @(posedge clk_2);
-            #100ps;
-            transmit_2 = 1'b1;
-            
-            new_value(rnd_value, tx_byte_2);
-            
-            @(posedge clk_2);
-            #100ps;
-            transmit_2 = 1'b0;
+            new_value(clk_2, transmit_2, rnd_value, tx_byte_2);
             
             get_time (t0, t1);
 
